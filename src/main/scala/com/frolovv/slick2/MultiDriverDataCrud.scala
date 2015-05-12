@@ -21,6 +21,11 @@ class MultiDriverDataCrud(val driver: JdbcDriver, val db: JdbcDriver.simple.Data
 
   private val table = TableQuery[DataTable]
 
+  private def reset = db.withSession { implicit session =>
+    Try(table.ddl.drop)
+    Try(table.ddl.create)
+  }
+
   override def insert(data: Data): Unit = db.withSession { implicit session =>
     table +=(data.id, data.value)
   }
@@ -48,13 +53,15 @@ class MultiDriverDataCrud(val driver: JdbcDriver, val db: JdbcDriver.simple.Data
 }
 
 object MultiDriverDataCrud {
-  def inmem(): MultiDriverDataCrud = {
+  def h2(): MultiDriverDataCrud = {
     val driver = scala.slick.driver.H2Driver
     val database = driver.simple.Database
 
     val db = database.forURL("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;TRACE_LEVEL_FILE=0;TRACE_LEVEL_SYSTEM_OUT=0", driver = "org.h2.Driver")
 
-    new MultiDriverDataCrud(driver, db)
+    val crud = new MultiDriverDataCrud(driver, db)
+    crud.reset
+    crud
   }
 
   import javax.sql.DataSource
@@ -64,6 +71,17 @@ object MultiDriverDataCrud {
     val db = driver.simple.Database.forDataSource(dataSource)
 
     new MultiDriverDataCrud(driver, db)
+  }
+
+  def sqlite(): MultiDriverDataCrud = {
+    val driver = scala.slick.driver.H2Driver
+    val database = driver.simple.Database
+
+    val db = database.forURL("jdbc:sqlite::memory:;DB_CLOSE_DELAY=-1;", driver = "org.sqlite.JDBC")
+
+    val crud = new MultiDriverDataCrud(driver, db)
+    crud.reset
+    crud
   }
 }
 
